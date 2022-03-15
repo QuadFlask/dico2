@@ -41,7 +41,10 @@ function usePeer(apiKey: string = "peerjs") {
   const startCall = useCallback((peerId: string, stream: MediaStream) => {
     if (peer) {
       console.log("start call", peerId, stream);
-      peer.call(peerId, stream);
+      const remote = peer.call(peerId, stream);
+      remote.on('stream', remoteStream => {
+        playStream(remoteStream);
+      })
     }
   }, [peer]);
 
@@ -103,6 +106,7 @@ function App() {
 export default App;
 
 function playStream(stream: MediaStream) {
+  console.log("play stream");
   let audio = new Audio();
   audio.srcObject = stream;
   audio.play();

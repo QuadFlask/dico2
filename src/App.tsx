@@ -1,7 +1,11 @@
 import Peer, {AnswerOption} from 'peerjs';
 import React, {ChangeEvent, useCallback, useEffect, useState} from 'react';
+import {useQuery} from "react-query";
+import {atom, useRecoilState, useSetRecoilState} from "recoil";
+import styled from "styled-components";
 
 function usePeer(apiKey: string = "peerjs") {
+  const {log, error: logError} = useLog("usePeer");
   const [peer, setPeer] = useState<Peer | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [call, setCall] = useState<Peer.MediaConnection | null>(null);
@@ -9,30 +13,30 @@ function usePeer(apiKey: string = "peerjs") {
   useEffect(() => {
     const peer = new Peer({key: "peerjs"});
     peer.on('open', () => {
-      console.log("open. peer id: " + peer.id);
+      log("open. peer id: " + peer.id);
       setPeer(peer);
     });
     peer.on('error', error => {
-      console.error(error);
+      logError(error);
       setError(error);
     });
   }, []);
 
   const listen = useCallback((stream?: MediaStream, options?: AnswerOption) => {
     if (!peer) return;
-    console.log("try listening...", stream, peer, call);
+    log("try listening...", stream, peer, call);
 
     if (call === null) {
-      console.log('wait for call');
+      log('wait for call');
       peer.on('call', call => {
-        console.log('call', call);
+        log('call', call);
         setCall(call);
       });
     } else {
-      console.log('answering');
+      log('answering');
       call.answer(stream, options);
       call.on('stream', stream => {
-        console.log('on stream', stream);
+        log('on stream', stream);
         playStream(stream);
       });
     }
@@ -40,7 +44,7 @@ function usePeer(apiKey: string = "peerjs") {
 
   const startCall = useCallback((peerId: string, stream: MediaStream) => {
     if (peer) {
-      console.log("start call", peerId, stream);
+      log("start call", peerId, stream);
       const remote = peer.call(peerId, stream);
       remote.on('stream', remoteStream => {
         playStream(remoteStream);
@@ -52,15 +56,16 @@ function usePeer(apiKey: string = "peerjs") {
 }
 
 function useAudioStream() {
+  const {log, error: logError} = useLog("useAudioStream");
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const requestAudioAccess = useCallback(() => {
     navigator.getUserMedia({audio: true, video: false}, stream => {
-      console.log("stream ok");
+      log("stream ok");
       setStream(stream);
     }, error => {
-      console.error(error);
+      logError(error);
       setError(error)
     });
   }, []);
@@ -69,6 +74,8 @@ function useAudioStream() {
 }
 
 function App() {
+  const {logs} = useLog("App");
+  const version = useVersion();
   const [targetId, setTargetId] = useState("");
   const handleInput = (e: ChangeEvent<HTMLInputElement>) => setTargetId(e.target.value);
 
@@ -84,6 +91,7 @@ function App() {
   }, [listen, stream]);
 
   return <div className="App">
+    version: {version}
     <div>
       my Id:
       <button onClick={e => peer?.id && navigator.clipboard.writeText(peer.id)}>{peer?.id}</button>
@@ -99,9 +107,17 @@ function App() {
       }}>startCall
       </button>
     </div>
-    <audio autoPlay id="#audio"/>
+    <hr/>
+    <div>
+      {logs.map((log, i) => <LogLine key={i}>{log}</LogLine>)}
+    </div>
   </div>
 }
+
+const LogLine = styled.pre`
+  margin: 0;
+  color: white;
+`;
 
 export default App;
 
@@ -110,4 +126,34 @@ function playStream(stream: MediaStream) {
   let audio = new Audio();
   audio.srcObject = stream;
   audio.play();
+}
+
+function useVersion() {
+  const {isLoading, error, data} = useQuery('app-version', () => fetch(`asset-manifest.json`).then(r => r.json()));
+  return isLoading ? '...' : error ? 'error' : data;
+}
+
+const atoms = {
+  logs: atom<string[]>({
+    key: 'logs',
+    default: [],
+  }),
+};
+
+function useLog(prefix: string = "") {
+  const [logs, setLogs] = useRecoilState(atoms.logs);
+  const updateLogs = useSetRecoilState(atoms.logs); // TODO setLogs what's difference?
+
+  const log = useCallback((...args: any[]) => {
+    const newLog = `${new Date().toISOString()} [INFO]  [${prefix}]\t: ` + args.toString();
+    updateLogs(logs => ([...logs, newLog]));
+    console.log(...args);
+  }, [prefix, updateLogs]);
+  const error = useCallback((...args: any[]) => {
+    const newLog = `${new Date().toISOString()} [ERROR] [${prefix}]\t: ` + args.toString();
+    updateLogs(logs => ([...logs, newLog]));
+    console.error(...args);
+  }, [prefix, updateLogs]);
+
+  return {logs, log, error};
 }

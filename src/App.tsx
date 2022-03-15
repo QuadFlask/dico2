@@ -20,7 +20,7 @@ function usePeer(apiKey: string = "peerjs") {
       logError(error);
       setError(error);
     });
-  }, []);
+  }, [log, logError]);
 
   const listen = useCallback((stream?: MediaStream, options?: AnswerOption) => {
     if (!peer) return;
@@ -40,7 +40,7 @@ function usePeer(apiKey: string = "peerjs") {
         playStream(stream);
       });
     }
-  }, [peer, call]);
+  }, [peer, log, call]);
 
   const startCall = useCallback((peerId: string, stream: MediaStream) => {
     if (peer) {
@@ -50,7 +50,7 @@ function usePeer(apiKey: string = "peerjs") {
         playStream(remoteStream);
       })
     }
-  }, [peer]);
+  }, [log, peer]);
 
   return {peer, id: peer?.id, error, call, listen, startCall};
 }
@@ -68,7 +68,7 @@ function useAudioStream() {
       logError(error);
       setError(error)
     });
-  }, []);
+  }, [log, logError]);
 
   return {stream, error, requestAudioAccess};
 }
@@ -130,7 +130,12 @@ function playStream(stream: MediaStream) {
 
 function useVersion() {
   const {isLoading, error, data} = useQuery('app-version', () => fetch(`asset-manifest.json`).then(r => r.json()));
-  return isLoading ? '...' : error ? 'error' : data;
+  try {
+    return isLoading ? '...' : error ? 'error' : data.entrypoints[1].split('/')[2].split('.')[1];
+  } catch (e) {
+    console.error(e);
+  }
+  return "error!";
 }
 
 const atoms = {

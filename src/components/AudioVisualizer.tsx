@@ -19,7 +19,6 @@ export default function AudioVisualizer(props: AudioVisualizerProps) {
       const source = audioContext.createMediaStreamSource(props.mediaStream);
       source.connect(analyser);
       dataArrayRef.current = dataArray;
-      // setAnalyser(analyser);
       analyserRef.current = analyser;
       return () => {
         analyser.disconnect();
@@ -30,8 +29,9 @@ export default function AudioVisualizer(props: AudioVisualizerProps) {
 
   useRequestAnimationFrame((progress, next) => {
     const analyser = analyserRef.current;
-    if (analyser && progress % 2 === 0 && dataArrayRef.current) {
+    if (analyser && progress % 1 === 0 && dataArrayRef.current) {
       analyser.getByteTimeDomainData(dataArrayRef.current);
+      // analyser.getByteFrequencyData(dataArrayRef.current);
       render(ref.current, dataArrayRef.current);
     }
     next();
@@ -41,7 +41,6 @@ export default function AudioVisualizer(props: AudioVisualizerProps) {
 }
 
 function render(canvas: HTMLCanvasElement | null, data: Uint8Array | null) {
-  console.log("render");
   if (canvas && data) {
     const {width, height} = canvas;
     const sliceWidth = width / data.length;
@@ -54,9 +53,11 @@ function render(canvas: HTMLCanvasElement | null, data: Uint8Array | null) {
     context.clearRect(0, 0, width, height);
     context.beginPath();
     context.moveTo(0, height / 2);
+    // context.moveTo(0, height);
     let x = 0;
     for (const item of data) {
       const y = item / 255.0 * height;
+      // const y = height - item / 2;
       context.lineTo(x, y);
       x += sliceWidth;
     }
